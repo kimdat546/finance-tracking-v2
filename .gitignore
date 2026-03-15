@@ -1,0 +1,251 @@
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Poetry
+poetry.lock
+*.lock
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Type checking
+.pytype/
+
+# Virtual environments
+.venv
+venv/
+ENV/
+
+# ============================================================================
+# Node / Frontend
+# ============================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Dependencies
+package-lock.json
+yarn.lock
+
+# Production
+/build
+/dist
+/.next
+/out
+
+# Misc
+.DS_Store
+*.pem
+.env.local
+.env.*.local
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================================================
+# Docker
+# ============================================================================
+.dockerignore
+docker-compose.override.yml
+
+# ============================================================================
+# Environment Variables & Secrets
+# ============================================================================
+.env
+.env.local
+.env.*.local
+.env.prod
+.env.production
+
+# Secrets directory
+secrets/
+!secrets/.gitkeep
+credentials.json
+token.json
+
+# ============================================================================
+# IDE / Editor
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.sublime-project
+.sublime-workspace
+.atom/
+.project
+.pydevproject
+.settings/
+*.iml
+*.sublime-project
+*.sublime-workspace
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-v][a-z]
+[._]sw[a-p]
+*~
+.netrwhist
+tags
+
+# ============================================================================
+# OS Specific
+# ============================================================================
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+._*
+.AppleDouble
+.LSOverride
+ehthumbs.db
+
+# ============================================================================
+# Backup & Logs
+# ============================================================================
+*.log
+*.log.*
+logs/
+*.bak
+*.backup
+*.tmp
+*.temp
+.backups/
+backups/
+
+# Database & Cache
+*.db
+*.sqlite
+*.sqlite3
+*.postgres
+*.redis
+
+# ============================================================================
+# Build Artifacts
+# ============================================================================
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# ============================================================================
+# Project Specific
+# ============================================================================
+# Backup directory
+.backups/
+backups/
+scripts/backups/
+
+# Local development files
+.local/
+.tmp/
+.cache/
+
+# Pre-restore backups
+pre_restore_*.sql.gz
+
+# Application specific
+instance/
+.webassets-cache
+
+# ============================================================================
+# CI/CD
+# ============================================================================
+.github/workflows/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# ============================================================================
+# Documentation
+# ============================================================================
+site/
+docs/_build/
+.vuepress/dist/
+
+# ============================================================================
+# AWS / Cloud
+# ============================================================================
+.aws/
+.gcloud/
+*.pem
+*.key
+terraform/
+cloudformation/
+
+# ============================================================================
+# Testing
+# ============================================================================
+.pytest_cache/
+.coverage
+htmlcov/
+test-results/
+junit.xml
+
+# ============================================================================
+# System Temporary Files
+# ============================================================================
+.vagrant/
+.vagrant_ansible_inventory
+*.swp
+*.swo
+*~
+.tmp/
+.temp/

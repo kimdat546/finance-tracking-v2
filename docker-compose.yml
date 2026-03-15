@@ -1,0 +1,107 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finance-tracker-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-finance_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finance_password}
+      POSTGRES_DB: ${POSTGRES_DB:-finance_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - finance-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: finance-tracker-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - finance-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: finance-tracker-backend
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      DEBUG: ${DEBUG:-true}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-finance_user}:${POSTGRES_PASSWORD:-finance_password}@postgres:5432/${POSTGRES_DB:-finance_db}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      GMAIL_CREDENTIALS_PATH: ${GMAIL_CREDENTIALS_PATH:-/secrets/credentials.json}
+      GMAIL_TOKEN_PATH: ${GMAIL_TOKEN_PATH:-/secrets/token.json}
+      EMAIL_SYNC_INTERVAL_MINUTES: ${EMAIL_SYNC_INTERVAL_MINUTES:-15}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000", "http://localhost:8000"]}
+      BACKUP_DIR: ${BACKUP_DIR:-/var/backups/finance-tracker}
+      ENABLE_EMAIL_SYNC: ${ENABLE_EMAIL_SYNC:-true}
+      ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-true}
+      ENABLE_PARSER_AUTO_DISCOVERY: ${ENABLE_PARSER_AUTO_DISCOVERY:-true}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./secrets:/secrets:ro
+      - backend_logs:/var/logs/finance-tracker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - finance-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: finance-tracker-frontend
+    environment:
+      REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL:-http://localhost:8000}
+      REACT_APP_ENV: ${REACT_APP_ENV:-development}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - finance-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_logs:
+    driver: local
+
+networks:
+  finance-network:
+    driver: bridge

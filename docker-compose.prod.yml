@@ -1,0 +1,131 @@
+version: '3.9'
+
+services:
+  postgres:
+    restart: always
+    ports: []
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/backups:/var/backups
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  redis:
+    restart: always
+    ports: []
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  backend:
+    restart: always
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+    volumes:
+      - ./secrets:/secrets:ro
+      - backend_logs:/var/logs/finance-tracker
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1.5G
+        reservations:
+          cpus: '1'
+          memory: 1G
+      replicas: 2
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    restart: always
+    environment:
+      REACT_APP_ENV: production
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_BASE_URL: "https://${DOMAIN:-localhost}/api"
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  nginx:
+    image: nginx:latest
+    container_name: finance-tracker-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/cache:/var/cache/nginx
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - finance-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  backup:
+    image: postgres:16-alpine
+    container_name: finance-tracker-backup
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-finance_password}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+    volumes:
+      - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
+      - ./scripts/backups:/var/backups
+      - postgres_data:/postgres_data:ro
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        while true; do
+          /usr/local/bin/backup.sh
+          sleep 86400
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - finance-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_logs:
+    driver: local
+
+networks:
+  finance-network:
+    driver: bridge
