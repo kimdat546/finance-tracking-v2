@@ -55,7 +55,7 @@ class Account(Base):
         "Transaction", back_populates="account", cascade="all, delete-orphan"
     )
     categorization_rules: Mapped[list["CategorizationRule"]] = relationship(
-        "CategorizationRule", back_populates="account", cascade="all, delete-orphan"
+        "CategorizationRule", back_populates="account"
     )
 
     __table_args__ = (Index("idx_account_user_id", "user_id"),)
@@ -80,13 +80,17 @@ class Category(Base):
 
     # Relationships
     transactions: Mapped[list["Transaction"]] = relationship(
-        "Transaction", back_populates="category"
+        "Transaction",
+        back_populates="category",
+        foreign_keys="Transaction.category_id",
     )
     children: Mapped[list["Category"]] = relationship(
         "Category",
-        remote_side=[id],
         backref="parent",
+        remote_side="Category.id",
+        foreign_keys="[Category.parent_id]",
         cascade="all, delete-orphan",
+        single_parent=True,
     )
 
     __table_args__ = (
@@ -131,9 +135,24 @@ class Transaction(Base):
     is_reconciled: Mapped[bool] = mapped_column(Boolean, default=False)
     is_duplicate: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Review / categorization metadata
+    needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    review_reason: Mapped[str | None] = mapped_column(String(500))
+    suggested_category_id: Mapped[str | None] = mapped_column(
+        ForeignKey("categories.id", use_alter=True, name="fk_transaction_suggested_category"),
+        nullable=True,
+    )
+    categorization_confidence: Mapped[float] = mapped_column(default=0.0)
+    categorization_source: Mapped[str | None] = mapped_column(String(50))
+
     # Relationships
     account: Mapped[Account] = relationship("Account", back_populates="transactions")
-    category: Mapped[Category | None] = relationship("Category", back_populates="transactions")
+    category: Mapped[Category | None] = relationship(
+        "Category", back_populates="transactions", foreign_keys="Transaction.category_id"
+    )
+    suggested_category: Mapped[Category | None] = relationship(
+        "Category", foreign_keys="Transaction.suggested_category_id"
+    )
 
     __table_args__ = (
         Index("idx_transaction_user_id", "user_id"),
@@ -150,14 +169,21 @@ class CategorizationRule(Base):
     __tablename__ = "categorization_rules"
 
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
-    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"), nullable=True)
     category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"), nullable=False)
 
     # Rule matching criteria
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
 
-    # Pattern matching
+    # Unified pattern matching (new schema)
+    pattern: Mapped[str | None] = mapped_column(String(500))
+    match_type: Mapped[str] = mapped_column(String(50), default="contains")
+    # "contains" | "regex" | "startswith" | "exact"
+    match_field: Mapped[str] = mapped_column(String(50), default="description")
+    # "description" | "merchant" | "any"
+
+    # Legacy pattern matching (kept for backward compatibility)
     merchant_pattern: Mapped[str | None] = mapped_column(String(255))
     description_pattern: Mapped[str | None] = mapped_column(String(255))
     min_amount: Mapped[Decimal | None] = mapped_column(DECIMAL(15, 2))
@@ -171,12 +197,17 @@ class CategorizationRule(Base):
     is_regex: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # Learning metadata
+    auto_created: Mapped[bool] = mapped_column(Boolean, default=False)
+
     # Match statistics
     match_count: Mapped[int] = mapped_column(default=0)
     last_matched_at: Mapped[str | None] = mapped_column(String(50))
 
     # Relationships
-    account: Mapped[Account] = relationship("Account", back_populates="categorization_rules")
+    account: Mapped[Account | None] = relationship(
+        "Account", back_populates="categorization_rules"
+    )
     category: Mapped[Category] = relationship("Category")
 
     __table_args__ = (

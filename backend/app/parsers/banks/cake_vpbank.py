@@ -83,8 +83,8 @@ class CakeVPBankParser(BaseBankParser):
             if "<html" in email_body.lower() or "<table" in email_body.lower():
                 return self._parse_html(email_body)
 
-            # Fall back to text parsing
-            return self._parse_text(email_body)
+            # Fall back to enhanced text parsing
+            return self._parse_plain_text_enhanced(email_body)
         except Exception as e:
             logger.error(f"Error parsing Cake/VPBank email: {e}")
             return None
@@ -106,9 +106,24 @@ class CakeVPBankParser(BaseBankParser):
         if not data:
             return None
 
+        # Normalise keys: strip trailing colons/whitespace for lookup
+        normalised_data: dict[str, str] = {}
+        for k, v in data.items():
+            normalised_data[k.rstrip(":").strip()] = v
+
         # Determine direction by looking for keywords
-        amount_str = data.get("Amount", data.get("amount", ""))
-        description = data.get("Description", data.get("description", ""))
+        amount_str = (
+            normalised_data.get("Amount")
+            or normalised_data.get("amount")
+            or normalised_data.get("Số tiền")
+            or ""
+        )
+        description = (
+            normalised_data.get("Description")
+            or normalised_data.get("description")
+            or normalised_data.get("Nội dung")
+            or ""
+        )
 
         # Parse amount
         try:
@@ -121,7 +136,13 @@ class CakeVPBankParser(BaseBankParser):
         direction = self._detect_direction(html_content, description)
 
         # Parse date
-        date_str = data.get("Date", data.get("date", data.get("Time", "")))
+        date_str = (
+            normalised_data.get("Date")
+            or normalised_data.get("date")
+            or normalised_data.get("Time")
+            or normalised_data.get("Thời gian")
+            or ""
+        )
         transaction_date = None
         if date_str:
             try:
@@ -129,19 +150,37 @@ class CakeVPBankParser(BaseBankParser):
             except ValueError:
                 logger.warning(f"Could not parse date: {date_str}")
 
-        # Extract merchant/counterparty
-        merchant = data.get(
-            "Counterparty",
-            data.get("counterparty", data.get("From", data.get("from", None))),
-        )
+        # Extract merchant/counterparty using enhanced method
+        merchant = self._extract_merchant(html_content, normalised_data)
+        if not merchant:
+            merchant = (
+                normalised_data.get("Counterparty")
+                or normalised_data.get("counterparty")
+                or normalised_data.get("From")
+                or normalised_data.get("from")
+                or normalised_data.get("Người gửi")
+                or None
+            )
 
-        # Extract reference ID
-        reference_id = data.get("Reference", data.get("reference", data.get("ID", None)))
+        # Extract reference ID using enhanced method
+        reference_id = self._extract_reference(normalised_data)
+        if not reference_id:
+            reference_id = (
+                normalised_data.get("Reference")
+                or normalised_data.get("reference")
+                or normalised_data.get("ID")
+                or normalised_data.get("Mã tham chiếu")
+                or None
+            )
+
+        # Determine transaction type and prefix description
+        transaction_type = self._determine_transaction_type(html_content, description, direction)
+        prefixed_description = f"[{transaction_type.upper()}] {description or 'Cake/VPBank transaction'}"
 
         return ParsedTransaction(
             amount=amount,
             currency="VND",
-            description=description or "Cake/VPBank transaction",
+            description=prefixed_description,
             direction=direction,
             merchant=merchant,
             transaction_date=transaction_date,
@@ -151,6 +190,17 @@ class CakeVPBankParser(BaseBankParser):
 
     def _parse_text(self, text_content: str) -> ParsedTransaction | None:
         """Parse plain text email content.
+
+        Args:
+            text_content: Plain text email body
+
+        Returns:
+            ParsedTransaction or None
+        """
+        return self._parse_plain_text_enhanced(text_content)
+
+    def _parse_plain_text_enhanced(self, text_content: str) -> ParsedTransaction | None:
+        """Parse plain text email content with enhanced extraction.
 
         Args:
             text_content: Plain text email body
@@ -185,14 +235,148 @@ class CakeVPBankParser(BaseBankParser):
             except ValueError:
                 pass
 
+        # Extract merchant from known label patterns
+        merchant_match = re.search(
+            r"(?:Gửi cho|Người nhận|To|Receiver):\s*(.+?)(?:\n|$)",
+            text_content,
+            re.IGNORECASE,
+        )
+        merchant: str | None = None
+        if merchant_match:
+            raw_merchant = merchant_match.group(1).strip()
+            merchant = self._clean_merchant(raw_merchant)
+
+        # Extract reference from known label patterns
+        ref_match = re.search(
+            r"(?:Mã GD|Ref|Reference|Transaction ID):\s*(\w+)",
+            text_content,
+            re.IGNORECASE,
+        )
+        reference_id: str | None = ref_match.group(1) if ref_match else None
+
+        # Determine transaction type and build description
+        description = "Cake/VPBank transaction"
+        transaction_type = self._determine_transaction_type(text_content, description, direction)
+        prefixed_description = f"[{transaction_type.upper()}] {description}"
+
         return ParsedTransaction(
             amount=amount,
             currency="VND",
-            description="Cake/VPBank transaction",
+            description=prefixed_description,
             direction=direction,
+            merchant=merchant,
             transaction_date=transaction_date,
+            reference_id=reference_id,
             raw_text=text_content[:500],
         )
+
+    def _clean_merchant(self, raw: str) -> str:
+        """Clean a raw merchant/receiver string.
+
+        Strips bank codes in brackets or parentheses, collapses extra spaces.
+
+        Args:
+            raw: Raw merchant string
+
+        Returns:
+            Cleaned merchant name
+        """
+        # Remove anything in brackets or parentheses (bank codes, account numbers)
+        cleaned = re.sub(r"\s*[\(\[][^\)\]]*[\)\]]", "", raw)
+        # Collapse multiple spaces to one and strip edges
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned
+
+    def _extract_merchant(self, content: str, data: dict) -> str | None:
+        """Extract merchant name from email data dict or content.
+
+        Tries a list of common keys used in Cake/VPBank emails. Strips bank
+        codes (text inside parentheses or brackets) and normalises whitespace.
+
+        Args:
+            content: Raw email content (unused directly but kept for extensibility)
+            data: Key-value pairs extracted from the email
+
+        Returns:
+            Cleaned merchant name, or None if not found
+        """
+        candidate_keys = [
+            "Receiver",
+            "receiver",
+            "Gửi cho",
+            "Chuyển đến",
+            "Merchant",
+            "Người nhận",
+            "To",
+            "Counterparty",
+            "counterparty",
+        ]
+        for key in candidate_keys:
+            value = data.get(key)
+            if value:
+                return self._clean_merchant(value)
+        return None
+
+    def _extract_reference(self, data: dict) -> str | None:
+        """Extract transaction reference/ID from email data dict.
+
+        Args:
+            data: Key-value pairs extracted from the email
+
+        Returns:
+            Reference string, or None if not found
+        """
+        candidate_keys = [
+            "Reference",
+            "Ref",
+            "Mã giao dịch",
+            "Transaction ID",
+            "ID",
+            "Số tham chiếu",
+            "Mã tham chiếu",
+        ]
+        for key in candidate_keys:
+            value = data.get(key)
+            if value:
+                return value.strip()
+        return None
+
+    def _determine_transaction_type(
+        self,
+        content: str,
+        description: str,
+        direction: TransactionDirection,
+    ) -> str:
+        """Determine the specific transaction type from content and direction.
+
+        Args:
+            content: Raw email content
+            description: Parsed transaction description
+            direction: Detected transaction direction
+
+        Returns:
+            One of: "income", "expense", "transfer", "withdrawal", "purchase"
+        """
+        combined = (content + " " + (description or "")).lower()
+
+        if "atm" in combined or "rút tiền" in combined:
+            return "withdrawal"
+
+        if "mua" in combined or "purchase" in combined or "pos" in combined:
+            return "purchase"
+
+        if direction == TransactionDirection.INCOMING:
+            return "income"
+
+        # Outgoing: distinguish transfer vs generic expense
+        if (
+            "chuyển tiền" in combined
+            or "transfer" in combined
+            or "gửi" in combined
+        ):
+            return "transfer"
+
+        return "expense"
 
     def _extract_key_value_pairs(self, soup: BeautifulSoup) -> dict[str, str]:
         """Extract key-value pairs from HTML structure.
@@ -265,6 +449,11 @@ class CakeVPBankParser(BaseBankParser):
             "incoming",
             "transfer in",
             "incoming transfer",
+            # Vietnamese additions
+            "nhận tiền",
+            "tiền vào",
+            "cộng tiền",
+            "nhận được",
         ]
 
         # Keywords for outgoing transactions
@@ -277,9 +466,16 @@ class CakeVPBankParser(BaseBankParser):
             "transfer out",
             "outgoing transfer",
             "transfer",
+            # Vietnamese additions
+            "chuyển tiền",
+            "tiền ra",
+            "trừ tiền",
+            "thanh toán",
+            "chi tiêu",
+            "giao dịch chi",
         ]
 
-        # Check for incoming keywords
+        # Check for incoming keywords first (more specific)
         for keyword in incoming_keywords:
             if keyword in content_lower or keyword in description_lower:
                 return TransactionDirection.INCOMING

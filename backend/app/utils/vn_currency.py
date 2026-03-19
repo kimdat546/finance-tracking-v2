@@ -32,18 +32,21 @@ def parse_vnd_amount(amount_str: str) -> Decimal:
         # Mixed or US format but with comma thousands: unlikely, use period as decimal
         cleaned = cleaned.replace(",", "")
     else:
-        # Only periods, could be thousands or decimal
-        # If last period is followed by exactly 2 digits, it's decimal
+        # Only periods (no commas), could be thousands or decimal
         if last_period != -1:
-            after_period = cleaned[last_period + 1 :]
-            if len(after_period) == 2 and after_period.isdigit():
-                # Keep as is - decimal
+            period_count = cleaned.count(".")
+            after_last_period = cleaned[last_period + 1 :]
+            if period_count > 1:
+                # Multiple periods → all are thousand separators
+                cleaned = cleaned.replace(".", "")
+            elif len(after_last_period) == 2 and after_last_period.isdigit():
+                # Single period followed by 2 digits → decimal
                 pass
-            elif len(after_period) == 3 and after_period.isdigit():
-                # Thousand separator, remove it
-                cleaned = cleaned[:last_period] + cleaned[last_period + 1 :]
+            elif len(after_last_period) == 3 and after_last_period.isdigit():
+                # Single period followed by 3 digits → thousand separator
+                cleaned = cleaned.replace(".", "")
             else:
-                # Remove all periods as thousand separators
+                # Fallback: remove all periods as thousand separators
                 cleaned = cleaned.replace(".", "")
 
     # Remove any remaining whitespace

@@ -209,6 +209,11 @@ bash-frontend: ## Open bash shell in frontend container
 test: test-backend test-frontend ## Run all tests
 	@echo "$(GREEN)✓ All tests passed$(NC)"
 
+test-docker: ## Run backend tests inside Docker (uses real PostgreSQL)
+	@echo "$(BLUE)Running backend tests in Docker with PostgreSQL...$(NC)"
+	@$(DOCKER_COMPOSE) exec -e TEST_DATABASE_URL=postgresql+asyncpg://finance_user:finance_password@postgres:5432/finance_db backend python -m pytest tests/ -v --no-cov -p no:cacheprovider -o "addopts="
+	@echo "$(GREEN)✓ Docker tests passed$(NC)"
+
 test-quick: test-backend-quick ## Run quick tests (no coverage)
 	@echo "$(GREEN)✓ Quick tests passed$(NC)"
 

@@ -1,9 +1,13 @@
 """Base parser classes and abstractions."""
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.services.health_monitor import HealthMonitorService
 
 
 class TransactionDirection(str, Enum):
@@ -125,6 +129,56 @@ class BaseBankParser(ABC):
             received_date=received_date,
             amount=amount,
         )
+
+    async def parse_with_metrics(
+        self,
+        email_body: str,
+        monitor: "HealthMonitorService | None" = None,
+        transaction_type: str | None = None,
+        user_id: str | None = None,
+    ) -> "ParsedTransaction | None":
+        """Parse with optional health metrics collection.
+
+        When *monitor* is ``None`` this method delegates directly to
+        :meth:`parse` without any overhead.  When a monitor is supplied it
+        records the elapsed time and success/failure outcome after the call
+        completes.  Monitoring errors are silently suppressed so they never
+        break the main parsing flow.
+
+        Args:
+            email_body: Email body content (HTML or plain text).
+            monitor: Optional :class:`~app.services.health_monitor.HealthMonitorService`
+                instance to record metrics into.
+            transaction_type: Optional transaction type hint passed to the
+                monitor.
+            user_id: Optional user scope passed to the monitor.
+
+        Returns:
+            :class:`ParsedTransaction` if parsing succeeded, ``None`` otherwise.
+        """
+        if monitor is None:
+            return await self.parse(email_body)
+
+        start = time.time()
+        success = False
+        try:
+            result = await self.parse(email_body)
+            success = result is not None
+            return result
+        except Exception:
+            raise
+        finally:
+            elapsed_ms = (time.time() - start) * 1000
+            try:
+                await monitor.record_parse_attempt(
+                    parser_name=self.name,
+                    success=success,
+                    parse_time_ms=elapsed_ms,
+                    transaction_type=transaction_type,
+                    user_id=user_id,
+                )
+            except Exception:
+                pass
 
     def __repr__(self) -> str:
         """String representation."""

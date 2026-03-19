@@ -55,17 +55,19 @@ services:
       GMAIL_CREDENTIALS_PATH: ${GMAIL_CREDENTIALS_PATH:-/secrets/credentials.json}
       GMAIL_TOKEN_PATH: ${GMAIL_TOKEN_PATH:-/secrets/token.json}
       EMAIL_SYNC_INTERVAL_MINUTES: ${EMAIL_SYNC_INTERVAL_MINUTES:-15}
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000", "http://localhost:8000"]}
+      CORS_ORIGINS: '["http://localhost:5173", "http://localhost:8000"]'
       BACKUP_DIR: ${BACKUP_DIR:-/var/backups/finance-tracker}
-      ENABLE_EMAIL_SYNC: ${ENABLE_EMAIL_SYNC:-true}
-      ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-true}
+      ENABLE_EMAIL_SYNC: ${ENABLE_EMAIL_SYNC:-false}
+      ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-false}
       ENABLE_PARSER_AUTO_DISCOVERY: ${ENABLE_PARSER_AUTO_DISCOVERY:-true}
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/tests:/app/tests
+      - ./backend/alembic.ini:/app/alembic.ini
       - ./secrets:/secrets:ro
-      - backend_logs:/var/logs/finance-tracker
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,16 +80,19 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: finance-tracker-frontend
     environment:
-      REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL:-http://localhost:8000}
-      REACT_APP_ENV: ${REACT_APP_ENV:-development}
+      VITE_API_URL: http://localhost:8000
     ports:
-      - "3000:3000"
+      - "5173:5173"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/postcss.config.js:/app/postcss.config.js
     depends_on:
       - backend
     networks:
@@ -98,8 +103,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  backend_logs:
     driver: local
 
 networks:

@@ -26,6 +26,8 @@ export interface Account {
   balance: number
   currency: string
   type: 'bank' | 'cash' | 'credit_card' | 'crypto'
+  institution?: string
+  account_type?: string
 }
 
 export interface Contact {
@@ -90,13 +92,15 @@ export interface Budget {
   id: string
   name: string
   category?: Category
-  limit: number
-  spent: number
+  amount: number
+  spent_amount: number
+  remaining: number
   currency: string
-  period: 'monthly' | 'yearly'
-  month?: string
-  year?: number
-  status: 'on_track' | 'warning' | 'exceeded'
+  period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+  start_date: string
+  end_date?: string
+  alert_threshold: number
+  is_active: boolean
   createdAt: string
   updatedAt: string
 }
@@ -134,10 +138,13 @@ export interface Subscription {
   name: string
   amount: number
   currency: string
-  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
-  nextBillingDate: string
+  billing_cycle: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+  next_billing_date: string
+  start_date: string
+  end_date?: string
   category?: Category
-  status: 'active' | 'paused' | 'cancelled'
+  is_active: boolean
+  is_auto_renew: boolean
   createdAt: string
   updatedAt: string
 }

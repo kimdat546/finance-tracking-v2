@@ -2,8 +2,8 @@
 
 import asyncio
 import logging
+import os
 from logging.config import fileConfig
-from pathlib import Path
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -15,15 +15,21 @@ from alembic import context
 from app.database import Base
 from app.models import (
     Account,
+    Alias,
     Budget,
     Category,
     CategorizationRule,
     Contact,
     Debt,
+    DynamicParserSpec,
+    Email,
+    EmailAccount,
     EmailSyncLog,
     Goal,
+    ParserDisabledLog,
     ParserError,
     ParserHealthAlert,
+    ParserHealthMetric,
     ParserRegistry,
     ParserVersion,
     SplitBill,
@@ -31,6 +37,8 @@ from app.models import (
     SplitParticipant,
     Subscription,
     Transaction,
+    TransactionGroup,
+    TransactionGroupMember,
     UnrecognizedEmail,
     User,
     UserSetting,
@@ -47,6 +55,11 @@ if config.config_file_name is not None:
 
 # Model's MetaData object for 'autogenerate' support
 target_metadata = Base.metadata
+
+# Override sqlalchemy.url from DATABASE_URL env var if set
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
 
 logger = logging.getLogger("alembic.env")
 

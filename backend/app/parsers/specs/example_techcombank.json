@@ -1,0 +1,51 @@
+{
+  "name": "techcombank_example",
+  "version": "1.0.0",
+  "enabled": false,
+  "priority": 100,
+  "description": "Example Techcombank parser (for reference only, not production-ready)",
+  "matchers": [
+    {"field": "sender", "pattern": "techcombank", "type": "substring"},
+    {"field": "subject", "pattern": "giao dịch|transaction", "type": "regex"}
+  ],
+  "extractors": [
+    {
+      "name": "amount",
+      "source": "body",
+      "pattern": "(?:Số tiền|Amount):\\s*([\\d.,]+)",
+      "type": "regex",
+      "group": 1,
+      "transform": "parse_vnd",
+      "required": true
+    },
+    {
+      "name": "merchant",
+      "source": "body",
+      "pattern": "(?:Người nhận|Receiver):\\s*(.+?)(?:\\n|$)",
+      "type": "regex",
+      "group": 1,
+      "transform": "normalize_merchant"
+    },
+    {
+      "name": "date",
+      "source": "body",
+      "pattern": "(\\d{1,2}/\\d{1,2}/\\d{4}[,\\s]+\\d{1,2}:\\d{2})",
+      "type": "regex",
+      "group": 1,
+      "transform": "parse_vn_date"
+    },
+    {
+      "name": "reference",
+      "source": "body",
+      "pattern": "(?:Mã GD|Reference):\\s*(\\w+)",
+      "type": "regex",
+      "group": 1
+    }
+  ],
+  "rules": [
+    {
+      "condition": {"field": "description", "operator": "contains", "value": "rút tiền"},
+      "action": {"field": "direction", "value": "outgoing"}
+    }
+  ]
+}

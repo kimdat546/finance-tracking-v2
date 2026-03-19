@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button } from '@/components/ui'
-import { Settings, Plus, Trash2 } from 'lucide-react'
+import { Settings, Plus, Trash2, Mail, Wand2, ChevronRight, Database, FileDown } from 'lucide-react'
 
 export const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'accounts' | 'categories' | 'rules' | 'parsers' | 'sync' | 'backup'>('accounts')
@@ -161,50 +162,133 @@ export const SettingsPage: React.FC = () => {
       )}
 
       {activeTab === 'parsers' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Email Parsers</CardTitle>
-            <CardDescription>
-              Tạo parser để trích xuất giao dịch từ email
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center h-40">
-            <Button variant="primary">
-              <Plus className="w-4 h-4 mr-2" />
-              Thêm Parser
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Email Parsers
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Link
+              to="/settings/email-parsers"
+              className="group block"
+            >
+              <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-primary-300 dark:hover:border-primary-700">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+                    <Mail className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                      Quản lý Email Parsers
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Xem, bật/tắt và kiểm tra các parser
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors flex-shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link
+              to="/settings/parser-generator"
+              className="group block"
+            >
+              <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-primary-300 dark:hover:border-primary-700">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
+                    <Wand2 className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                      Tạo Parser Mới
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Hướng dẫn từng bước từ email mẫu
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors flex-shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Thông tin</CardTitle>
+              <CardDescription>
+                Email parser tự động đọc email ngân hàng và trích xuất giao dịch vào hệ thống.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400 list-disc list-inside">
+                <li>Parser có sẵn hỗ trợ hầu hết các ngân hàng Việt Nam lớn</li>
+                <li>Tạo custom parser cho ngân hàng chưa được hỗ trợ</li>
+                <li>Kiểm tra và debug parser trước khi bật</li>
+                <li>Theo dõi tỉ lệ thành công theo thời gian</li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {activeTab === 'sync' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Đồng Bộ Email</CardTitle>
-            <CardDescription>
-              Kết nối email để tự động tải giao dịch
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center h-40">
-            <Button variant="primary">Kết Nối Email</Button>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Link to="/settings/sync" className="group block">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-primary-300 dark:hover:border-primary-700">
+              <CardContent className="flex items-center gap-4 p-4">
+                <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                    Quản lý Đồng Bộ Gmail
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Kết nối Gmail, kích hoạt đồng bộ và nhập email thủ công
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors flex-shrink-0" />
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
       )}
 
       {activeTab === 'backup' && (
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Sao Lưu Dữ Liệu</CardTitle>
-              <CardDescription>
-                Tải xuống hoặc khôi phục dữ liệu của bạn
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex gap-4">
-              <Button variant="primary">Sao Lưu Bây Giờ</Button>
-              <Button variant="secondary">Khôi Phục Từ File</Button>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Link to="/settings/backup" className="group block">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-primary-300 dark:hover:border-primary-700">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="w-10 h-10 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center flex-shrink-0">
+                    <Database className="w-5 h-5 text-success-600 dark:text-success-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm">Sao Lưu & Khôi Phục</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Xuất/nhập toàn bộ dữ liệu JSON</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors flex-shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link to="/settings/export" className="group block">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-primary-300 dark:hover:border-primary-700">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+                    <FileDown className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm">Xuất Dữ Liệu</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Xuất CSV/JSON cho Excel, Sheets</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors flex-shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
         </div>
       )}
     </div>

@@ -7,6 +7,8 @@ import pytest
 from app.parsers.banks.cake_vpbank import CakeVPBankParser
 from app.parsers.base import TransactionDirection
 
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
 
 class TestCakeVPBankParser:
     """Test suite for CakeVPBankParser."""
@@ -37,7 +39,7 @@ class TestCakeVPBankParser:
         assert result.currency == "VND"
         assert result.direction == TransactionDirection.INCOMING
         assert result.merchant == "Nguyễn Văn A (0123456789)"
-        assert "14/03/2026" in result.transaction_date or result.transaction_date is None
+        assert "2026-03-14" in result.transaction_date or result.transaction_date is None
 
     @pytest.mark.asyncio
     async def test_amount_parsing(self, parser: CakeVPBankParser) -> None:
@@ -201,3 +203,87 @@ class TestCakeVPBankParser:
             result = await parser.parse(html)
             assert result is not None
             assert result.amount == expected
+
+
+class TestCakeVPBankOutgoing:
+    """Tests for outgoing transaction parsing."""
+
+    @pytest.mark.asyncio
+    async def test_parse_outgoing_transfer_html(self) -> None:
+        """Test parsing outgoing transfer from HTML fixture."""
+        fixture_path = FIXTURES_DIR / "cake_outgoing_transfer.html"
+        html_content = fixture_path.read_text(encoding="utf-8")
+
+        parser = CakeVPBankParser()
+        result = await parser.parse(html_content)
+
+        assert result is not None
+        assert result.direction == TransactionDirection.OUTGOING
+        assert result.amount == 500000.0
+        assert result.amount > 0
+        assert result.merchant is not None
+        assert result.merchant == "Nguyen Van A"
+
+    @pytest.mark.asyncio
+    async def test_parse_withdrawal_text(self) -> None:
+        """Test parsing ATM withdrawal from plain text."""
+        fixture_path = FIXTURES_DIR / "cake_outgoing_withdrawal.txt"
+        text_content = fixture_path.read_text(encoding="utf-8")
+
+        parser = CakeVPBankParser()
+        result = await parser.parse(text_content)
+
+        assert result is not None
+        assert result.direction == TransactionDirection.OUTGOING
+        assert result.amount == 2000000.0
+
+    @pytest.mark.asyncio
+    async def test_detect_direction_incoming_vn_keywords(self) -> None:
+        """Test Vietnamese incoming keywords."""
+        parser = CakeVPBankParser()
+        content = "Bạn đã nhận tiền từ Nguyen Van A"
+        direction = parser._detect_direction(content, "")
+        assert direction == TransactionDirection.INCOMING
+
+    @pytest.mark.asyncio
+    async def test_detect_direction_outgoing_vn_keywords(self) -> None:
+        """Test Vietnamese outgoing keywords."""
+        parser = CakeVPBankParser()
+        content = "Chuyển tiền thành công"
+        direction = parser._detect_direction(content, "")
+        assert direction == TransactionDirection.OUTGOING
+
+    @pytest.mark.asyncio
+    async def test_extract_merchant_from_receiver_field(self) -> None:
+        """Test merchant extraction strips bank code from parentheses."""
+        parser = CakeVPBankParser()
+        data = {"Receiver": "Nguyen Van A (VCB)"}
+        merchant = parser._extract_merchant("", data)
+        assert merchant == "Nguyen Van A"
+
+    @pytest.mark.asyncio
+    async def test_extract_reference_number(self) -> None:
+        """Test reference extraction."""
+        parser = CakeVPBankParser()
+        data = {"Reference": "TXN20260315001"}
+        ref = parser._extract_reference(data)
+        assert ref == "TXN20260315001"
+
+    @pytest.mark.asyncio
+    async def test_matches_email_by_sender(self) -> None:
+        """Test email matching by sender."""
+        parser = CakeVPBankParser()
+        assert parser.matches_email("noreply@cake.vn", "Transaction Notification")
+
+    @pytest.mark.asyncio
+    async def test_matches_email_by_subject_vn(self) -> None:
+        """Test email matching by Vietnamese subject."""
+        parser = CakeVPBankParser()
+        assert parser.matches_email("bank@other.com", "Đơn giao dịch Cake")
+
+    @pytest.mark.asyncio
+    async def test_parse_returns_none_for_invalid_email(self) -> None:
+        """Test parser returns None for unrelated email."""
+        parser = CakeVPBankParser()
+        result = await parser.parse("This is a regular email about cats")
+        assert result is None

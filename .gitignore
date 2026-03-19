@@ -82,7 +82,6 @@ yarn.lock
 # Misc
 .DS_Store
 *.pem
-.env.local
 .env.*.local
 
 # Debug
@@ -99,11 +98,8 @@ docker-compose.override.yml
 # ============================================================================
 # Environment Variables & Secrets
 # ============================================================================
-.env
-.env.local
 .env.*.local
 .env.prod
-.env.production
 
 # Secrets directory
 secrets/
@@ -249,3 +245,4 @@ junit.xml
 *~
 .tmp/
 .temp/
+config.bat

@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     GMAIL_TOKEN_PATH: str = Field(default="token.json")
     EMAIL_SYNC_INTERVAL_MINUTES: int = Field(default=15, ge=1)
 
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = Field(default="")
+    GOOGLE_CLIENT_SECRET: str = Field(default="")
+    GOOGLE_REDIRECT_URI: str = Field(default="http://localhost:8000/oauth/callback")
+
+    # Encryption
+    ENCRYPTION_KEY: str = Field(
+        default=""
+    )  # Base64 Fernet key, generate with encryption.generate_key()
+
     # CORS
     CORS_ORIGINS: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000"]

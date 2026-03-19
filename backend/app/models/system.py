@@ -1,14 +1,14 @@
 """System and configuration database models."""
 
-from enum import Enum
+from enum import Enum as PyEnum
 
-from sqlalchemy import Boolean, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, Enum as SQLEnum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 
-class ParserHealthStatus(str, Enum):
+class ParserHealthStatus(str, PyEnum):
     """Parser health status enumeration."""
 
     HEALTHY = "healthy"
@@ -16,7 +16,7 @@ class ParserHealthStatus(str, Enum):
     FAILED = "failed"
 
 
-class ParserErrorType(str, Enum):
+class ParserErrorType(str, PyEnum):
     """Parser error type enumeration."""
 
     PARSING_ERROR = "parsing_error"
@@ -79,6 +79,11 @@ class EmailSyncLog(Base):
     # Status
     status: Mapped[str] = mapped_column(String(50), default="pending")
     error_message: Mapped[str | None] = mapped_column(Text)
+
+    # Sync type and incremental sync tracking
+    sync_type: Mapped[str] = mapped_column(String(20), nullable=False, default="incremental")
+    history_id_start: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    history_id_end: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     __table_args__ = (Index("idx_email_sync_user_id", "user_id"),)
 
@@ -143,7 +148,7 @@ class ParserError(Base):
 
     # Error details
     error_type: Mapped[ParserErrorType] = mapped_column(
-        Enum(ParserErrorType), nullable=False
+        SQLEnum(ParserErrorType), nullable=False
     )
     error_message: Mapped[str] = mapped_column(Text, nullable=False)
     error_context: Mapped[str | None] = mapped_column(Text)
@@ -178,6 +183,12 @@ class UnrecognizedEmail(Base):
 
     # Content
     body_preview: Mapped[str | None] = mapped_column(Text)
+    raw_body: Mapped[str | None] = mapped_column(Text)
+
+    # Parse failure details
+    parse_error: Mapped[str | None] = mapped_column(Text)
+    parsed_attempt: Mapped[str | None] = mapped_column(Text)
+    similar_transaction_ids: Mapped[str | None] = mapped_column(Text)
 
     # Processing
     manual_category: Mapped[str | None] = mapped_column(String(255))
@@ -186,6 +197,7 @@ class UnrecognizedEmail(Base):
 
     # Status
     is_processed: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
 
     __table_args__ = (
         Index("idx_unrecognized_email_user_id", "user_id"),
@@ -203,7 +215,7 @@ class ParserHealthAlert(Base):
 
     # Alert details
     status: Mapped[ParserHealthStatus] = mapped_column(
-        Enum(ParserHealthStatus), default=ParserHealthStatus.HEALTHY
+        SQLEnum(ParserHealthStatus), default=ParserHealthStatus.HEALTHY
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
 

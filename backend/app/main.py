@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import router
 from app.config import settings
 from app.database import DatabaseManager
+from app.middleware.request_counter import RequestCounterMiddleware
 from app.parsers.registry import registry
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request counter middleware
+app.add_middleware(RequestCounterMiddleware)
 
 # Include API router
 app.include_router(router)

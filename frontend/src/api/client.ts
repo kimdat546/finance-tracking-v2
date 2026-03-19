@@ -36,4 +36,14 @@ client.interceptors.response.use(
   }
 )
 
+// ---------------------------------------------------------------------------
+// Current user ID helper
+// TODO: Replace with real auth context when authentication is implemented
+// ---------------------------------------------------------------------------
+const DEFAULT_USER_ID = 'test-user-1'
+
+export function getCurrentUserId(): string {
+  return localStorage.getItem('userId') || DEFAULT_USER_ID
+}
+
 export default client

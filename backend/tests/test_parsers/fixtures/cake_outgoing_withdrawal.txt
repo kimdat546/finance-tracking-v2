@@ -1,0 +1,5 @@
+Thông báo giao dịch Cake
+Rút tiền ATM
+Số tiền: 2.000.000 đ
+Ngày: 15/03/2026, 09:00:00
+Mã GD: ATM20260315

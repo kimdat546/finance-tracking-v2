@@ -1,16 +1,42 @@
 """Test configuration and fixtures."""
 
 import asyncio
+import os
 from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import event, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool, StaticPool
 
-from app.config import settings
-from app.database import Base, DatabaseManager
+from app.database import Base
 from app.main import app
+from app.models.system import User
 from fastapi.testclient import TestClient
+
+
+# ---------------------------------------------------------------------------
+# Test database engine
+# ---------------------------------------------------------------------------
+# Use PostgreSQL if TEST_DATABASE_URL is set (Docker / CI), else SQLite
+# ---------------------------------------------------------------------------
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
+
+if TEST_DATABASE_URL:
+    # PostgreSQL (Docker)
+    test_engine = create_async_engine(
+        TEST_DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,
+    )
+else:
+    # SQLite in-memory fallback (fast, but some PG features won't work)
+    test_engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        echo=False,
+        poolclass=StaticPool,
+    )
 
 
 @pytest.fixture(scope="session")
@@ -23,15 +49,8 @@ def event_loop() -> asyncio.AbstractEventLoop:
 
 @pytest_asyncio.fixture
 async def test_db() -> AsyncGenerator[AsyncSession, None]:
-    """Create test database session."""
-    # Use in-memory SQLite for tests
-    test_engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        echo=False,
-        poolclass=None,
-    )
-
-    # Create tables
+    """Create test database session with clean tables per test."""
+    # Create all tables
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -45,32 +64,55 @@ async def test_db() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         yield session
 
-    # Cleanup
-    await test_engine.dispose()
+    # Drop all tables after each test for isolation
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest.fixture
 def test_client() -> TestClient:
-    """Create FastAPI test client."""
-    return TestClient(app)
+    """Create FastAPI test client with test DB dependency override."""
+    import asyncio
+    from app.database import get_db
+
+    async def _override_get_db():
+        async_session_maker = async_sessionmaker(
+            test_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+        async with async_session_maker() as session:
+            yield session
+
+    # Ensure tables exist
+    async def _setup():
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.get_event_loop().run_until_complete(_setup())
+
+    app.dependency_overrides[get_db] = _override_get_db
+    client = TestClient(app)
+    yield client
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
 def sample_user_id() -> str:
     """Sample user ID for tests."""
-    return "test-user-123"
+    return "00000000-0000-0000-0000-000000000123"
 
 
 @pytest.fixture
 def sample_account_id() -> str:
     """Sample account ID for tests."""
-    return "test-account-456"
+    return "00000000-0000-0000-0000-000000000456"
 
 
 @pytest.fixture
 def sample_category_id() -> str:
     """Sample category ID for tests."""
-    return "test-category-789"
+    return "00000000-0000-0000-0000-000000000789"
 
 
 # Factory functions for test data
@@ -79,20 +121,11 @@ class TransactionFactory:
 
     @staticmethod
     def build(
-        user_id: str = "test-user",
-        account_id: str = "test-account",
+        user_id: str = "00000000-0000-0000-0000-000000000001",
+        account_id: str = "00000000-0000-0000-0000-000000000002",
         **kwargs,
     ) -> dict:
-        """Build transaction data.
-
-        Args:
-            user_id: User ID
-            account_id: Account ID
-            **kwargs: Additional fields
-
-        Returns:
-            Transaction data dictionary
-        """
+        """Build transaction data."""
         data = {
             "user_id": user_id,
             "account_id": account_id,
@@ -112,16 +145,8 @@ class AccountFactory:
     """Factory for creating test accounts."""
 
     @staticmethod
-    def build(user_id: str = "test-user", **kwargs) -> dict:
-        """Build account data.
-
-        Args:
-            user_id: User ID
-            **kwargs: Additional fields
-
-        Returns:
-            Account data dictionary
-        """
+    def build(user_id: str = "00000000-0000-0000-0000-000000000001", **kwargs) -> dict:
+        """Build account data."""
         data = {
             "user_id": user_id,
             "name": kwargs.get("name", "Test Account"),
@@ -137,16 +162,8 @@ class CategoryFactory:
     """Factory for creating test categories."""
 
     @staticmethod
-    def build(user_id: str = "test-user", **kwargs) -> dict:
-        """Build category data.
-
-        Args:
-            user_id: User ID
-            **kwargs: Additional fields
-
-        Returns:
-            Category data dictionary
-        """
+    def build(user_id: str = "00000000-0000-0000-0000-000000000001", **kwargs) -> dict:
+        """Build category data."""
         data = {
             "user_id": user_id,
             "name": kwargs.get("name", "Test Category"),
@@ -173,3 +190,34 @@ def account_factory() -> type:
 def category_factory() -> type:
     """Provide category factory."""
     return CategoryFactory
+
+
+async def create_test_user(
+    session: AsyncSession,
+    user_id: str = "00000000-0000-0000-0000-000000000001",
+    email: str | None = None,
+    username: str | None = None,
+) -> User:
+    """Create and persist a test User record.
+
+    Uses the ``user_id`` to derive unique ``email``, ``username``, and
+    ``schema_name`` values so that multiple users can coexist in a single
+    test session without violating uniqueness constraints.
+    """
+    user = User(
+        id=user_id,
+        email=email or f"user-{user_id}@test.example.com",
+        username=username or f"user-{user_id}",
+        hashed_password="$2b$12$fakehashfortest",
+        schema_name=f"schema_{user_id}",
+        is_active=True,
+    )
+    session.add(user)
+    await session.flush()
+    return user
+
+
+@pytest_asyncio.fixture
+async def test_user(test_db: AsyncSession) -> User:
+    """Provide a default test User record (user_id ending in ...0001)."""
+    return await create_test_user(test_db, user_id="00000000-0000-0000-0000-000000000001")

@@ -150,6 +150,39 @@ class ParserRegistry:
         logger.info(f"Auto-discovered {discovered} parsers")
         return discovered
 
+    def register_dynamic_parser(
+        self, spec_dict: dict, override: bool = True
+    ) -> bool:
+        """Register a dynamic parser from a JSON spec dictionary.
+
+        Validates the spec via Pydantic, instantiates a DynamicParser, and
+        stores the instance directly in the registry. Returns True on success.
+
+        Args:
+            spec_dict: Raw parser spec as a plain dictionary.
+            override: Whether to overwrite an existing parser with the same name.
+
+        Returns:
+            True if the parser was registered successfully, False otherwise.
+        """
+        from app.parsers.dynamic_parser import load_parser_from_dict
+
+        try:
+            parser = load_parser_from_dict(spec_dict)
+            if parser.name in self._parser_instances and not override:
+                logger.warning(
+                    f"Dynamic parser '{parser.name}' already registered, skipping"
+                )
+                return False
+            self._parser_instances[parser.name] = parser
+            logger.info(
+                f"Registered dynamic parser: {parser.name} (v{parser.version})"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to register dynamic parser: {e}")
+            return False
+
     def list_parsers(self) -> list[dict[str, str]]:
         """List all registered parsers with metadata.
 
